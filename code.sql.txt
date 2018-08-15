@@ -1,0 +1,300 @@
+SLIDE 3:
+--1. Find when the earliest and latest subscription start dates.
+SELECT MIN(subscription_start) AS 'First_subscription_start', MAX(subscription_start) AS 'Last_subscription_start'
+FROM subscriptions;
+
+--2. Find when the earliest and latest subscription end dates.
+SELECT MIN(subscription_end) AS 'First_subscription_ends', MAX(subscription_end) AS 'Last_subscription_ends'
+FROM subscriptions;
+
+
+SLIDE 4
+-- # of Operating Months
+WITH months AS (
+  SELECT 
+    '2016-11-01' AS 'first_day', 
+    '2016-11-30' AS 'last_day' 
+  UNION
+  SELECT 
+    '2016-12-01' AS 'first_day', 
+    '2016-12-31' AS 'last_day' 
+  UNION
+  SELECT 
+    '2017-01-01' AS 'first_day', 
+    '2017-01-31' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-02-01' AS 'first_day', 
+    '2017-02-28' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-03-01' AS 'first_day', 
+    '2017-03-31' AS 'last_day'), 
+cross_join AS (SELECT *
+  FROM subscriptions
+  CROSS JOIN months), 
+status AS (SELECT id, 
+    first_day AS 'month', 
+    CASE
+      WHEN (subscription_start < last_day)
+        AND (subscription_end > last_day OR subscription_end IS NULL)
+      THEN 1
+      ELSE 0
+    END AS 'user_in_month'
+  FROM cross_join), 
+status_aggregate AS (SELECT month, 
+    SUM(user_in_month) AS 'users' 
+  FROM status 
+  GROUP BY month),
+time AS (SELECT *
+FROM status_aggregate
+WHERE users > 0)
+SELECT COUNT(month) AS 'Months_Operating'
+FROM time;
+
+
+SLIDE 5
+-- Cancellations in the month
+WITH months AS (
+  SELECT 
+    '2016-12-01' AS 'first_day', 
+    '2016-12-31' AS 'last_day' 
+  UNION
+  SELECT 
+    '2017-01-01' AS 'first_day', 
+    '2017-01-31' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-02-01' AS 'first_day', 
+    '2017-02-28' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-03-01' AS 'first_day', 
+    '2017-03-31' AS 'last_day'
+  UNION
+  SELECT
+    '2017-04-01' AS 'first_day', 
+    '2017-04-30' AS 'last_day'), 
+cross_join AS (SELECT *
+  FROM subscriptions
+  CROSS JOIN months), 
+status AS (SELECT id, 
+    first_day AS 'month', 
+    CASE
+      WHEN (subscription_end < last_day)
+       AND (subscription_end > first_day)
+      THEN 1
+      ELSE 0
+    END AS 'users_ending'
+  FROM cross_join), 
+status_aggregate AS (SELECT month, 
+    SUM(users_ending) AS 'Cancellations_in_Month' 
+  FROM status 
+  GROUP BY month)
+SELECT *
+FROM status_aggregate;
+
+-- # of Possible months for Churn Rates 
+WITH months AS (
+  SELECT 
+    '2016-12-01' AS 'first_day', 
+    '2016-12-31' AS 'last_day' 
+  UNION
+  SELECT 
+    '2017-01-01' AS 'first_day', 
+    '2017-01-31' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-02-01' AS 'first_day', 
+    '2017-02-28' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-03-01' AS 'first_day', 
+    '2017-03-31' AS 'last_day'
+  UNION
+  SELECT
+    '2017-04-01' AS 'first_day', 
+    '2017-04-30' AS 'last_day'), 
+cross_join AS (SELECT *
+  FROM subscriptions
+  CROSS JOIN months), 
+status AS (SELECT id, 
+    first_day AS 'month', 
+    CASE
+      WHEN (subscription_end < last_day)
+       AND (subscription_end > first_day)
+      THEN 1
+      ELSE 0
+    END AS 'users_ending'
+  FROM cross_join), 
+status_aggregate AS (SELECT month, 
+    SUM(users_ending) AS 'Cancellations_in_Month' 
+  FROM status 
+  GROUP BY month)
+SELECT COUNT(Cancellations_in_Month) AS 'Possible_Churn_Rates'
+FROM status_aggregate
+WHERE Cancellations_in_Month > 0;
+
+
+SLIDE 6
+-- Count of Segments
+With seg_count AS (SELECT *
+                  FROM subscriptions
+                  GROUP BY segment)
+SELECT COUNT(*) AS '# of Segments'
+FROM seg_count;
+
+-- Names of the segments
+SELECT DISTINCT segment
+FROM subscriptions;
+
+
+SLIDE 7
+--Overall Churn Rate for Codeflix
+WITH months AS (SELECT 
+    '2017-12-01' AS 'first_day', 
+    '2017-03-31' AS 'last_day'), 
+cross_join AS (SELECT *
+  FROM subscriptions
+  CROSS JOIN months), 
+status AS (SELECT id, 
+    first_day AS 'month', 
+    CASE
+      WHEN (subscription_start < last_day) 
+      THEN 1
+      ELSE 0
+    END AS 'users', 
+    CASE
+      WHEN subscription_end < last_day THEN 1
+      ELSE 0
+    END AS 'has_canceled' 
+  FROM cross_join), 
+status_aggregate AS (SELECT month, 
+    SUM(users) AS 'active', 
+    SUM(has_canceled) AS 'canceled' 
+  FROM status 
+  GROUP BY month) 
+SELECT 
+1.0 * canceled / active AS 'Overall_Churn_Rate' 
+FROM status_aggregate;
+
+
+SLIDE 8
+-- Monthly Churn Rate
+WITH months AS (SELECT 
+    '2017-01-01' AS 'first_day', 
+    '2017-01-31' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-02-01' AS 'first_day', 
+    '2017-02-28' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-03-01' AS 'first_day', 
+    '2017-03-31' AS 'last_day'), 
+cross_join AS (SELECT *
+  FROM subscriptions
+  CROSS JOIN months), 
+status AS (SELECT id, 
+    first_day AS 'month', 
+    CASE
+      WHEN (subscription_start < first_day) 
+        AND (
+          subscription_end > first_day 
+          OR subscription_end IS NULL
+        ) THEN 1
+      ELSE 0
+    END AS 'is_active', 
+    CASE
+      WHEN subscription_end BETWEEN first_day AND last_day THEN 1
+      ELSE 0
+    END AS 'is_canceled' 
+  FROM cross_join), 
+status_aggregate AS (SELECT month, 
+    SUM(is_active) AS 'active', 
+    SUM(is_canceled) AS 'canceled' 
+  FROM status 
+  GROUP BY month) 
+SELECT month, 
+  ROUND(1.0 * canceled / active,3) AS 'Churn_Rate' 
+FROM status_aggregate;
+
+
+SLIDE 9
+-- Churn Rates for each segment by month
+WITH months AS (SELECT 
+    '2017-01-01' AS 'first_day', 
+    '2017-01-31' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-02-01' AS 'first_day', 
+    '2017-02-28' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-03-01' AS 'first_day', 
+    '2017-03-31' AS 'last_day'),
+cross_join AS (SELECT *
+              FROM subscriptions
+              CROSS JOIN months),
+status AS (SELECT id, first_day AS 'month', CASE 
+           WHEN (subscription_start <  first_day) 
+            AND (subscription_end > first_day OR subscription_end IS NULL)
+	    AND segment ='87' THEN 1
+           ELSE 0
+           END AS 'is_active_87', CASE
+           WHEN (subscription_start < first_day)
+            AND (subscription_end > first_day OR subscription_end IS NULL)                     
+            AND segment IS '30' THEN 1
+           ELSE 0
+           END AS 'is_active_30', 
+           CASE
+           WHEN segment = '87' AND (subscription_end BETWEEN first_day AND last_day)THEN 1
+           ELSE 0
+           END AS 'is_canceled_87', CASE
+           WHEN segment = '30' AND (subscription_end BETWEEN first_day AND last_day) THEN 1
+      ELSE 0
+    END AS 'is_canceled_30'
+           FROM cross_join),
+status_aggregate AS (SELECT month, SUM(is_active_87) AS 'sum_active_87', SUM(is_active_30) AS 'sum_active_30', SUM(is_canceled_87) AS 'sum_canceled_87', SUM(is_canceled_30) AS 'sum_canceled_30'
+                              FROM status
+                              GROUP BY month)
+              SELECT month, ROUND(1.0 * sum_canceled_87 / sum_active_87,3) AS 'Churn_Rate_87', ROUND(1.0 * sum_canceled_30 / sum_active_30,3) AS 'Churn_Rate_30' 
+              FROM status_aggregate;
+
+
+SLIDE 10
+-- Calculates Net Change in Users by segment per month
+WITH months AS (SELECT 
+    '2017-01-01' AS 'first_day', 
+    '2017-01-31' AS 'last_day' 
+  UNION 
+  SELECT 
+    '2017-02-01' AS 'first_day', 
+    '2017-02-28' AS 'last_day'
+  UNION 
+  SELECT 
+    '2017-03-01' AS 'first_day', 
+    '2017-03-31' AS 'last_day'),
+cross_join AS (SELECT *
+              FROM subscriptions
+              CROSS JOIN months),
+status AS (SELECT id, first_day AS 'month', CASE 
+           WHEN (subscription_start BETWEEN first_day AND last_day) AND segment = '87' THEN 1
+      ELSE 0
+    END AS 'added_87', CASE
+           WHEN (subscription_start BETWEEN first_day AND last_day) AND segment IS '30' THEN 1
+           ELSE 0
+           END AS 'added_30', CASE
+      WHEN segment = '87' AND (subscription_end BETWEEN first_day AND last_day) THEN 1
+      ELSE 0
+    END AS 'lost_87', CASE
+      WHEN segment = '30' AND (subscription_end BETWEEN first_day AND last_day) THEN 1
+      ELSE 0
+    END AS 'lost_30'
+           FROM cross_join
+          ),
+          status_aggregate AS (SELECT month, SUM(added_87) AS 'Added_by_87', SUM(added_30) AS 'Added_by_30', SUM(lost_87) AS 'Canceled_by_87', SUM(lost_30) AS 'Canceled_by_30'
+                              FROM status
+                              GROUP BY month)
+              SELECT month, 1*(Added_by_87-Canceled_by_87) AS 'Net Change in 87', 1*(Added_by_30-Canceled_by_30) AS 'Net Change in 30'
+              FROM status_aggregate;
